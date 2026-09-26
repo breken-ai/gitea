@@ -907,7 +907,7 @@ func ParseCodeOwnersLine(ctx context.Context, tokens []string) (*CodeOwnerRule, 
 			}
 
 			for _, team := range teams {
-				if team.Name == teamName {
+				if strings.EqualFold(team.Name, teamName) {
 					rule.Teams = append(rule.Teams, team)
 				}
 			}

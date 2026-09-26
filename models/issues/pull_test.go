@@ -41,6 +41,7 @@ func TestPullRequest(t *testing.T) {
 	t.Run("DeleteOrphanedObjects", testDeleteOrphanedObjects)
 	t.Run("ParseCodeOwnersLine", testParseCodeOwnersLine)
 	t.Run("CodeOwnerAbsolutePathPatterns", testCodeOwnerAbsolutePathPatterns)
+	t.Run("CodeOwnerTeamNameCase", testCodeOwnerTeamNameCase)
 	t.Run("CodeOwnerPatternMatchTimeout", testCodeOwnerPatternMatchTimeout)
 	t.Run("GetApprovers", testGetApprovers)
 	t.Run("GetPullRequestByMergedCommit", testGetPullRequestByMergedCommit)
@@ -376,6 +377,16 @@ func testCodeOwnerAbsolutePathPatterns(t *testing.T) {
 		regexpMatched, _ := rule.Rule.MatchString(c.file)
 		ruleMatched := regexpMatched == !rule.Negative
 		assert.Equal(t, c.expected, ruleMatched, "pattern %q against file %q", c.content, c.file)
+	}
+}
+
+// team names are case-insensitive, like user and organization names
+func testCodeOwnerTeamNameCase(t *testing.T) {
+	for _, owner := range []string{"@org3/Owners", "@org3/owners", "@ORG3/OWNERS"} {
+		rules, warnings := issues_model.GetCodeOwnersFromContent(t.Context(), ".* "+owner+"\n")
+		if assert.Len(t, rules, 1, "owner %s, warnings %v", owner, warnings) && assert.Len(t, rules[0].Teams, 1, "owner %s", owner) {
+			assert.EqualValues(t, 1, rules[0].Teams[0].ID, "owner %s", owner)
+		}
 	}
 }
 
