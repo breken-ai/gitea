@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitea.dev/models/organization"
+	"gitea.dev/modules/setting"
 	"gitea.dev/modules/templates"
 	shared_user "gitea.dev/routers/web/shared/user"
 	"gitea.dev/services/context"
@@ -20,21 +21,23 @@ const tplByRepos templates.TplName = "org/worktime"
 func parseOrgTimes(ctx *context.Context) (unixFrom, unixTo int64) {
 	rangeFrom := ctx.FormString("from")
 	rangeTo := ctx.FormString("to")
+	// the dates are days in the instance's UI time zone, the same as issue deadlines and the activity heatmap
+	now := time.Now().In(setting.DefaultUILocation)
 	if rangeFrom == "" {
-		rangeFrom = time.Now().Format("2006-01") + "-01" // defaults to start of current month
+		rangeFrom = now.Format("2006-01") + "-01" // defaults to start of current month
 	}
 	if rangeTo == "" {
-		rangeTo = time.Now().Format("2006-01-02") // defaults to today
+		rangeTo = now.Format("2006-01-02") // defaults to today
 	}
 
 	ctx.Data["RangeFrom"] = rangeFrom
 	ctx.Data["RangeTo"] = rangeTo
 
-	timeFrom, err := time.Parse("2006-01-02", rangeFrom)
+	timeFrom, err := time.ParseInLocation("2006-01-02", rangeFrom, setting.DefaultUILocation)
 	if err != nil {
 		ctx.ServerError("time.Parse", err)
 	}
-	timeTo, err := time.Parse("2006-01-02", rangeTo)
+	timeTo, err := time.ParseInLocation("2006-01-02", rangeTo, setting.DefaultUILocation)
 	if err != nil {
 		ctx.ServerError("time.Parse", err)
 	}
