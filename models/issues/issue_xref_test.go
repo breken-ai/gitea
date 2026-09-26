@@ -5,6 +5,7 @@ package issues_test
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 
 	"gitea.dev/models/db"
@@ -14,6 +15,8 @@ import (
 	"gitea.dev/models/unittest"
 	user_model "gitea.dev/models/user"
 	"gitea.dev/modules/references"
+	"gitea.dev/modules/setting"
+	"gitea.dev/modules/test"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -194,4 +197,21 @@ func testCreateComment(t *testing.T, doer, issue int64, content string) *issues_
 	assert.NoError(t, c.AddCrossReferences(ctx, d, false))
 	assert.NoError(t, committer.Commit())
 	return c
+}
+
+func TestXRef_AddCrossReferences_SubURL(t *testing.T) {
+	assert.NoError(t, unittest.PrepareTestDatabase())
+	appURL, err := url.Parse(setting.AppURL)
+	assert.NoError(t, err)
+	defer test.MockVariableValue(&setting.AppURL, appURL.Scheme+"://"+appURL.Host+"/sub/")()
+	defer test.MockVariableValue(&setting.AppSubURL, "/sub")()
+
+	itarget := testCreateIssue(t, 1, 2, "title1", "content1", false)
+
+	// PR description that closes the issue by its full URL on a sub-path instance
+	content := fmt.Sprintf("closes %suser2/repo1/issues/%d", setting.AppURL, itarget.Index)
+	pr := testCreateIssue(t, 1, 2, "title2", content, true)
+	ref := unittest.AssertExistsAndLoadBean(t, &issues_model.Comment{IssueID: itarget.ID, RefIssueID: pr.ID, RefCommentID: 0})
+	assert.Equal(t, issues_model.CommentTypePullRef, ref.Type)
+	assert.Equal(t, references.XRefActionCloses, ref.RefAction)
 }

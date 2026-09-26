@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gitea.dev/modules/setting"
+	"gitea.dev/modules/test"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -618,6 +619,21 @@ func TestParseCloseKeywords(t *testing.T) {
 			assert.Len(t, res, 1)
 			assert.Len(t, res[0], 2)
 			assert.Equal(t, test.expected, res[0][1])
+		}
+	}
+}
+
+func TestFindAllIssueReferencesMarkdownSubURL(t *testing.T) {
+	defer test.MockVariableValue(&setting.AppURL, "https://gitea.com:3000/sub/")()
+	defer test.MockVariableValue(&setting.AppSubURL, "/sub")()
+
+	for _, input := range []string{
+		"Closes [this issue](https://gitea.com:3000/sub/user/repo/issues/123)",
+		"Closes https://gitea.com:3000/sub/user/repo/issues/123",
+	} {
+		refs := FindAllIssueReferencesMarkdown(input)
+		if assert.Len(t, refs, 1, "Failed to parse: {%s}", input) {
+			assert.Equal(t, IssueReference{Index: 123, Owner: "user", Name: "repo", Action: XRefActionCloses}, refs[0], "Failed to parse: {%s}", input)
 		}
 	}
 }

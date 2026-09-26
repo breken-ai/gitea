@@ -480,8 +480,8 @@ func findAllIssueReferencesBytes(content []byte, links []string, originalContent
 			if host != "" && host != localhost {
 				continue
 			}
-			parts := strings.Split(u.EscapedPath(), "/")
-			// /user/repo/issues/3
+			// /user/repo/issues/3, after the sub-path of the instance URL (if any)
+			parts := strings.Split(strings.TrimPrefix(u.EscapedPath(), setting.AppSubURL), "/")
 			if len(parts) != 5 || parts[0] != "" {
 				continue
 			}
