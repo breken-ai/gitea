@@ -4,10 +4,14 @@
 package git
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"gitea.dev/modules/git/gitcmd"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseCommitFileStatus(t *testing.T) {
@@ -172,4 +176,44 @@ func TestGetCommitFileStatusMergesSha256(t *testing.T) {
 	assert.Equal(t, expected.Added, commitFileStatus.Added)
 	assert.Equal(t, expected.Removed, commitFileStatus.Removed)
 	assert.Equal(t, expected.Modified, commitFileStatus.Modified)
+}
+
+func TestGetCommitFileStatusTypeChange(t *testing.T) {
+	repoDir := filepath.Join(t.TempDir(), "repo-type-change.git")
+	require.NoError(t, gitcmd.NewCommand("init", "--bare").AddDynamicArguments(repoDir).Run(t.Context()))
+	// the second commit turns the regular file "config" into a symlink
+	stdin := `blob
+mark :1
+data 2
+a
+
+commit refs/heads/master
+mark :2
+author test <test@example.com> 1769202331 -0800
+committer test <test@example.com> 1769202331 -0800
+data 2
+A
+M 100644 :1 config
+M 100644 :1 target
+
+blob
+mark :3
+data 6
+target
+commit refs/heads/master
+mark :4
+author test <test@example.com> 1769202336 -0800
+committer test <test@example.com> 1769202336 -0800
+data 2
+B
+from :2
+M 120000 :3 config
+`
+	require.NoError(t, gitcmd.NewCommand("fast-import").WithDir(repoDir).WithStdinBytes([]byte(stdin)).Run(t.Context()))
+
+	commitFileStatus, err := GetCommitFileStatus(t.Context(), mockRepository(repoDir), "master")
+	require.NoError(t, err)
+	assert.Empty(t, commitFileStatus.Added)
+	assert.Empty(t, commitFileStatus.Removed)
+	assert.Equal(t, []string{"config"}, commitFileStatus.Modified)
 }

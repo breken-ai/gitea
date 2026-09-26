@@ -59,7 +59,7 @@ func parseCommitFileStatus(fileStatus *CommitFileStatus, stdout io.Reader) {
 			fileStatus.Added = append(fileStatus.Added, file)
 		case 'D':
 			fileStatus.Removed = append(fileStatus.Removed, file)
-		case 'M':
+		case 'M', 'T': // T: the file type changed, e.g. a regular file became a symlink
 			fileStatus.Modified = append(fileStatus.Modified, file)
 		}
 	}
