@@ -20,6 +20,7 @@ import (
 	"gitea.dev/modules/container"
 	"gitea.dev/modules/log"
 	base "gitea.dev/modules/migration"
+	"gitea.dev/modules/setting"
 	"gitea.dev/modules/structs"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go/v3"
@@ -236,11 +237,14 @@ func (g *GitlabDownloader) GetMilestones(ctx context.Context) ([]*base.Milestone
 
 			var deadline *time.Time
 			if m.DueDate != nil {
-				deadlineParsed, err := time.Parse("2006-01-02", m.DueDate.String())
+				// due_date is a plain date, use the end of that day in the UI time zone,
+				// the same as a deadline set in Gitea's own milestone form
+				deadlineParsed, err := time.ParseInLocation("2006-01-02", m.DueDate.String(), setting.DefaultUILocation)
 				if err != nil {
 					log.Trace("Error parsing Milestone DueDate time")
 					deadline = nil
 				} else {
+					deadlineParsed = time.Date(deadlineParsed.Year(), deadlineParsed.Month(), deadlineParsed.Day(), 23, 59, 59, 0, deadlineParsed.Location())
 					deadline = &deadlineParsed
 				}
 			}

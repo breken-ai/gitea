@@ -18,6 +18,9 @@ import (
 	"gitea.dev/models/unittest"
 	"gitea.dev/modules/json"
 	base "gitea.dev/modules/migration"
+	"gitea.dev/modules/setting"
+	"gitea.dev/modules/test"
+	"gitea.dev/modules/timeutil"
 
 	"github.com/stretchr/testify/assert"
 	gitlab "gitlab.com/gitlab-org/api/client-go/v3"
@@ -650,4 +653,24 @@ func TestGitlabIIDResolver(t *testing.T) {
 		assert.EqualValues(t, 2, r.generatePullRequestNumber(1))
 		r.recordIssueIID(3) // the generation procedure has been started, it shouldn't accept any new issue IID, so it panics
 	})
+}
+
+func TestGitlabMilestoneDueDateKeepsTheDay(t *testing.T) {
+	loc := time.FixedZone("UTC-5", -5*60*60)
+	defer test.MockVariableValue(&setting.DefaultUILocation, loc)()
+
+	mux, server, client := gitlabClientMockSetup(t)
+	defer gitlabClientMockTeardown(server)
+	mux.HandleFunc("/api/v4/projects/1324/milestones", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `[{"id":1,"iid":1,"project_id":1324,"title":"v1","state":"active","created_at":"2026-09-01T10:00:00Z","updated_at":"2026-09-01T10:00:00Z","due_date":"2026-09-30"}]`)
+	})
+
+	downloader := &GitlabDownloader{client: client, repoID: 1324, maxPerPage: 100}
+	milestones, err := downloader.GetMilestones(t.Context())
+	assert.NoError(t, err)
+	if assert.Len(t, milestones, 1) && assert.NotNil(t, milestones[0].Deadline) {
+		// Gitea shows a milestone deadline as a date in the UI time zone
+		assert.Equal(t, "2026-09-30", timeutil.TimeStamp(milestones[0].Deadline.Unix()).FormatDate())
+		assert.Equal(t, time.Date(2026, 9, 30, 23, 59, 59, 0, loc).Unix(), milestones[0].Deadline.Unix())
+	}
 }
